@@ -23,7 +23,6 @@ type Camera struct {
 	ImageWidth  int
 	imageHeight int
 
-	focalLength  float64
 	cameraCenter vec3.Vec3
 	LookFrom     vec3.Vec3
 	LookAt       vec3.Vec3
@@ -31,6 +30,11 @@ type Camera struct {
 	u            vec3.Vec3
 	v            vec3.Vec3
 	w            vec3.Vec3
+
+	DefocusAngle float64
+	FocusDist    float64
+	defocusDiskU vec3.Vec3
+	defocusDiskV vec3.Vec3
 
 	viewportHeight float64
 	viewportWidth  float64
@@ -58,6 +62,8 @@ func New() Camera {
 		LookFrom:        vec3.Vec3{X: 0, Y: 0, Z: 0},
 		LookAt:          vec3.Vec3{X: 0, Y: 0, Z: -1},
 		VUp:             vec3.Vec3{X: 0, Y: 1, Z: 0},
+		DefocusAngle:    0,
+		FocusDist:       10,
 	}
 }
 
@@ -66,10 +72,10 @@ func (cam *Camera) Initialize() {
 	cam.pixelSampleScale = 1. / float64(cam.NumberOfSamples)
 	cam.cameraCenter = cam.LookFrom
 
-	cam.focalLength = cam.LookFrom.Subtract(cam.LookAt).Length()
+	// cam.focalLength = cam.LookFrom.Subtract(cam.LookAt).Length()
 	theta := util.DegreesToRadians(cam.FieldOfView)
 	h := math.Tan(theta / 2)
-	cam.viewportHeight = 2 * h * cam.focalLength
+	cam.viewportHeight = 2 * h * cam.FocusDist
 	cam.viewportWidth = cam.viewportHeight * (float64(cam.ImageWidth) / float64(cam.imageHeight))
 
 	cam.w = cam.LookFrom.Subtract(cam.LookAt).Norm()
@@ -83,10 +89,14 @@ func (cam *Camera) Initialize() {
 	cam.deltaV = viewportV.Divide(float64(cam.imageHeight))
 
 	cam.viewportUpperLeft = cam.cameraCenter.
-		Subtract(cam.w.Scale(cam.focalLength)).
-		Subtract(viewportU.Divide(2)).
-		Subtract(viewportV.Divide(2))
-	cam.pixel00Loc = cam.viewportUpperLeft.Add(cam.deltaU.Add(cam.deltaV).Divide(2))
+		Subtract(cam.w.Scale(cam.FocusDist)).
+		Subtract(viewportU.Divide(2.)).
+		Subtract(viewportV.Divide(2.))
+	cam.pixel00Loc = cam.viewportUpperLeft.Add(cam.deltaU.Add(cam.deltaV).Divide(2.))
+
+	defocusRadius := cam.FocusDist * math.Tan(util.DegreesToRadians(cam.DefocusAngle/2.))
+	cam.defocusDiskU = cam.u.Scale(defocusRadius)
+	cam.defocusDiskV = cam.v.Scale(defocusRadius)
 }
 
 func rayColor(r ray.Ray, depth int, world hittable.HittableList) color.Color {
@@ -105,18 +115,31 @@ func rayColor(r ray.Ray, depth int, world hittable.HittableList) color.Color {
 	a := .5 * (r.Direction.Norm().Y + 1.0)
 	startColor := color.Color{R: 1., G: 1., B: 1.}
 	endColor := color.Color{R: .5, G: .7, B: 1.}
+
 	return startColor.Scale(1. - a).Add(endColor.Scale(a))
+}
+
+func (cam Camera) defocusDiskSample() vec3.Vec3 {
+	p := vec3.RandomInUnitDisk()
+	return cam.cameraCenter.Add(cam.defocusDiskU.Scale(p.X)).Add(cam.defocusDiskV.Scale(p.Y))
 }
 
 func (cam Camera) getRay(i int, j int) ray.Ray {
 	offset := cam.sampleSqure()
-	pixelCenter := cam.pixel00Loc.
+	pixelSample := cam.pixel00Loc.
 		Add(cam.deltaU.Scale(float64(j) + offset.X)).
 		Add(cam.deltaV.Scale(float64(i) + offset.Y))
 
+	var rayOrigin vec3.Vec3
+	if cam.DefocusAngle <= 0. {
+		rayOrigin = cam.cameraCenter
+	} else {
+		rayOrigin = cam.defocusDiskSample()
+	}
+
 	ray := ray.Ray{
-		Origin:    cam.cameraCenter,
-		Direction: pixelCenter.Subtract(cam.cameraCenter),
+		Origin:    rayOrigin,
+		Direction: pixelSample.Subtract(rayOrigin),
 	}
 
 	return ray
