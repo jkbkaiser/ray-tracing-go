@@ -19,6 +19,10 @@ func (c Color) Add(other Color) Color {
 	return Color{c.R + other.R, c.G + other.G, c.B + other.B}
 }
 
+func (c Color) Mult(other Color) Color {
+	return Color{c.R * other.R, c.G * other.G, c.B * other.B}
+}
+
 func (c Color) Scale(value float64) Color {
 	return Color{value * c.R, value * c.G, value * c.B}
 }

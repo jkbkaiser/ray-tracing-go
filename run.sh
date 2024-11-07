@@ -1,4 +1,4 @@
 cd ./src
-go run ./cmd/raytracer > ./../output.ppm
+go run . > ./../output.ppm
 cd ./..
 feh output.ppm

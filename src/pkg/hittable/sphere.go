@@ -3,6 +3,8 @@ package hittable
 import (
 	"math"
 
+	"jkbkaiser/ray-tracing-go/pkg/hitrecord"
+	"jkbkaiser/ray-tracing-go/pkg/material"
 	"jkbkaiser/ray-tracing-go/pkg/ray"
 	"jkbkaiser/ray-tracing-go/pkg/util/interval"
 	"jkbkaiser/ray-tracing-go/pkg/vec3"
@@ -11,13 +13,18 @@ import (
 type Sphere struct {
 	Center vec3.Vec3
 	Radius float64
+	mat    material.Material
 }
 
-func NewSphere(center vec3.Vec3, radius float64) Sphere {
-	return Sphere{center, radius}
+func NewSphere(center vec3.Vec3, radius float64, mat material.Material) Sphere {
+	return Sphere{center, radius, mat}
 }
 
-func (s Sphere) Hit(r ray.Ray, rayT interval.Interval, hitRecord *HitRecord) bool {
+func (s Sphere) Mat() material.Material {
+	return s.mat
+}
+
+func (s Sphere) Hit(r ray.Ray, rayT interval.Interval, hitRecord *hitrecord.HitRecord) bool {
 	oc := s.Center.Subtract(r.Origin)
 	a := r.Direction.Dot(r.Direction)
 	h := r.Direction.Dot(oc)
@@ -40,7 +47,7 @@ func (s Sphere) Hit(r ray.Ray, rayT interval.Interval, hitRecord *HitRecord) boo
 		}
 	}
 
-	hitRecord.t = root
+	hitRecord.T = root
 	hitRecord.Point = r.At(root)
 	outwardNormal := hitRecord.Point.Subtract(s.Center).Divide(s.Radius)
 	hitRecord.SetFrontFaceNormal(r, outwardNormal)

@@ -74,11 +74,12 @@ func rayColor(r ray.Ray, depth int, world hittable.HittableList) color.Color {
 		return color.Color{}
 	}
 
-	hitRecord := hittable.HitRecord{}
+	if hit, material, hitRecord := world.Hit(r, interval.New(0.001, math.Inf(1))); hit {
+		if scattered, attenuation, scatteredRay := material.Scatter(r, hitRecord); scattered {
+			return rayColor(scatteredRay, depth-1, world).Mult(attenuation)
+		}
 
-	if world.Hit(r, interval.New(0.001, math.Inf(1)), &hitRecord) {
-		direction := hitRecord.Normal.Add(vec3.RandomUnit())
-		return rayColor(ray.Ray{Origin: hitRecord.Point, Direction: direction}, depth-1, world).Scale(.5)
+		return color.Color{}
 	}
 
 	a := .5 * (r.Direction.Norm().Y + 1.0)

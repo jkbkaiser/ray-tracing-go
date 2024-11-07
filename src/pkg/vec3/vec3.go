@@ -54,6 +54,15 @@ func (v Vec3) Norm() Vec3 {
 	return v.Divide(v.Length())
 }
 
+func (v Vec3) NearZero() bool {
+	s := 1e-8
+	return (math.Abs(v.X) < s) && (math.Abs(v.Y) < s) && (math.Abs(v.Z) < s)
+}
+
+func Reflect(v, norm Vec3) Vec3 {
+	return v.Subtract(norm.Scale(v.Dot(norm)).Scale(2))
+}
+
 func Random() Vec3 {
 	return Vec3{
 		rand.Float64(),
