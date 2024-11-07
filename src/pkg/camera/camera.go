@@ -10,6 +10,7 @@ import (
 	"jkbkaiser/ray-tracing-go/pkg/hittable"
 	"jkbkaiser/ray-tracing-go/pkg/progress_bar"
 	"jkbkaiser/ray-tracing-go/pkg/ray"
+	"jkbkaiser/ray-tracing-go/pkg/util"
 	"jkbkaiser/ray-tracing-go/pkg/util/interval"
 	"jkbkaiser/ray-tracing-go/pkg/vec3"
 )
@@ -22,10 +23,16 @@ type Camera struct {
 	ImageWidth  int
 	imageHeight int
 
-	FocalLength  float64
-	CameraCenter vec3.Vec3
+	focalLength  float64
+	cameraCenter vec3.Vec3
+	LookFrom     vec3.Vec3
+	LookAt       vec3.Vec3
+	VUp          vec3.Vec3
+	u            vec3.Vec3
+	v            vec3.Vec3
+	w            vec3.Vec3
 
-	ViewportHeight float64
+	viewportHeight float64
 	viewportWidth  float64
 
 	viewportUpperLeft vec3.Vec3
@@ -37,36 +44,49 @@ type Camera struct {
 	pixelSampleScale float64
 
 	MaxDepth int
+
+	FieldOfView float64
 }
 
 func New() Camera {
 	return Camera{
 		AspectRatio:     16. / 9.,
 		ImageWidth:      400,
-		FocalLength:     1.,
-		ViewportHeight:  2.,
 		NumberOfSamples: 100,
 		MaxDepth:        50,
+		FieldOfView:     90,
+		LookFrom:        vec3.Vec3{X: 0, Y: 0, Z: 0},
+		LookAt:          vec3.Vec3{X: 0, Y: 0, Z: -1},
+		VUp:             vec3.Vec3{X: 0, Y: 1, Z: 0},
 	}
 }
 
-func (c *Camera) Initialize() {
-	c.imageHeight = int(float64(c.ImageWidth) / c.AspectRatio)
-	c.viewportWidth = c.ViewportHeight * (float64(c.ImageWidth) / float64(c.imageHeight))
+func (cam *Camera) Initialize() {
+	cam.imageHeight = int(float64(cam.ImageWidth) / cam.AspectRatio)
+	cam.pixelSampleScale = 1. / float64(cam.NumberOfSamples)
+	cam.cameraCenter = cam.LookFrom
 
-	viewportU := vec3.Vec3{X: c.viewportWidth, Y: 0., Z: 0.}
-	viewportV := vec3.Vec3{X: 0.0, Y: -c.ViewportHeight, Z: 0.}
+	cam.focalLength = cam.LookFrom.Subtract(cam.LookAt).Length()
+	theta := util.DegreesToRadians(cam.FieldOfView)
+	h := math.Tan(theta / 2)
+	cam.viewportHeight = 2 * h * cam.focalLength
+	cam.viewportWidth = cam.viewportHeight * (float64(cam.ImageWidth) / float64(cam.imageHeight))
 
-	c.deltaU = viewportU.Divide(float64(c.ImageWidth))
-	c.deltaV = viewportV.Divide(float64(c.imageHeight))
+	cam.w = cam.LookFrom.Subtract(cam.LookAt).Norm()
+	cam.u = cam.VUp.Cross(cam.w).Norm()
+	cam.v = cam.w.Cross(cam.u).Norm()
 
-	c.viewportUpperLeft = c.CameraCenter.
-		Subtract(vec3.Vec3{X: 0., Y: 0., Z: c.FocalLength}).
+	viewportU := cam.u.Scale(cam.viewportWidth)
+	viewportV := cam.v.Negative().Scale(cam.viewportHeight)
+
+	cam.deltaU = viewportU.Divide(float64(cam.ImageWidth))
+	cam.deltaV = viewportV.Divide(float64(cam.imageHeight))
+
+	cam.viewportUpperLeft = cam.cameraCenter.
+		Subtract(cam.w.Scale(cam.focalLength)).
 		Subtract(viewportU.Divide(2)).
 		Subtract(viewportV.Divide(2))
-	c.pixel00Loc = c.viewportUpperLeft.Add(c.deltaU.Add(c.deltaV).Divide(2))
-
-	c.pixelSampleScale = 1. / float64(c.NumberOfSamples)
+	cam.pixel00Loc = cam.viewportUpperLeft.Add(cam.deltaU.Add(cam.deltaV).Divide(2))
 }
 
 func rayColor(r ray.Ray, depth int, world hittable.HittableList) color.Color {
@@ -95,8 +115,8 @@ func (cam Camera) getRay(i int, j int) ray.Ray {
 		Add(cam.deltaV.Scale(float64(i) + offset.Y))
 
 	ray := ray.Ray{
-		Origin:    cam.CameraCenter,
-		Direction: pixelCenter.Subtract(cam.CameraCenter),
+		Origin:    cam.cameraCenter,
+		Direction: pixelCenter.Subtract(cam.cameraCenter),
 	}
 
 	return ray

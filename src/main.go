@@ -27,6 +27,11 @@ func main() {
 	cam.ImageWidth = 400
 	cam.NumberOfSamples = 100
 	cam.MaxDepth = 50
+	cam.FieldOfView = 20
+
+	cam.LookFrom = vec3.Vec3{X: -2, Y: 2, Z: 1}
+	cam.LookAt = vec3.Vec3{X: 0, Y: 0, Z: -1}
+	cam.VUp = vec3.Vec3{X: 0, Y: 1, Z: 0}
 
 	cam.Initialize()
 	cam.Render(world)
