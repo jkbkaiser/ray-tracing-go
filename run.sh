@@ -1,4 +1,4 @@
 cd ./src
-go run . > ./../output.ppm
+time (go run . > ./../output.ppm)
 cd ./..
 feh output.ppm
