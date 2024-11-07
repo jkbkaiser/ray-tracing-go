@@ -63,6 +63,13 @@ func Reflect(v, norm Vec3) Vec3 {
 	return v.Subtract(norm.Scale(v.Dot(norm)).Scale(2))
 }
 
+func Refract(v, norm Vec3, etaiOverEtat float64) Vec3 {
+	cosTheta := math.Min(v.Negative().Dot(norm), 1.)
+	rOutPerp := v.Add(norm.Scale(cosTheta)).Scale(etaiOverEtat)
+	rOutParallel := norm.Scale(-math.Sqrt(math.Abs(1. - rOutPerp.LengthSquared())))
+	return rOutPerp.Add(rOutParallel)
+}
+
 func Random() Vec3 {
 	return Vec3{
 		rand.Float64(),
