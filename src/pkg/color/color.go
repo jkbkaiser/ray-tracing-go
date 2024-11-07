@@ -2,7 +2,9 @@ package color
 
 import (
 	"fmt"
+	"jkbkaiser/ray-tracing-go/pkg/util/interval"
 	"jkbkaiser/ray-tracing-go/pkg/vec3"
+	"math"
 )
 
 type Color struct {
@@ -21,7 +23,25 @@ func (c Color) Scale(value float64) Color {
 	return Color{value * c.R, value * c.G, value * c.B}
 }
 
-func (c *Color) Write() {
+func LinearToGamma(component float64) float64 {
+	if component > 0 {
+		return math.Sqrt(component)
+	}
+
+	return component
+}
+
+func (c Color) Write() {
 	// Convert colors from range [0, 1] to range [0, 255]
-	fmt.Println(int(c.R*255.99), int(c.G*255.99), int(c.B*255.99))
+	i := interval.New(.000, .999)
+
+	r := i.Clamp(LinearToGamma(c.R))
+	g := i.Clamp(LinearToGamma(c.G))
+	b := i.Clamp(LinearToGamma(c.B))
+
+	fmt.Println(
+		int(r*255.99),
+		int(g*255.99),
+		int(b*255.99),
+	)
 }

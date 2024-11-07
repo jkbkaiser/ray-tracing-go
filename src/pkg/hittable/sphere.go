@@ -41,8 +41,8 @@ func (s Sphere) Hit(r ray.Ray, rayT interval.Interval, hitRecord *HitRecord) boo
 	}
 
 	hitRecord.t = root
-	hitRecord.point = r.At(root)
-	outwardNormal := hitRecord.point.Subtract(s.Center).Divide(s.Radius)
+	hitRecord.Point = r.At(root)
+	outwardNormal := hitRecord.Point.Subtract(s.Center).Divide(s.Radius)
 	hitRecord.SetFrontFaceNormal(r, outwardNormal)
 
 	return true

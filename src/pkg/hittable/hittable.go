@@ -7,7 +7,7 @@ import (
 )
 
 type HitRecord struct {
-	point     vec3.Vec3
+	Point     vec3.Vec3
 	Normal    vec3.Vec3
 	t         float64
 	frontFace bool

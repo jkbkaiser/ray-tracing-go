@@ -3,6 +3,7 @@ package camera
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"os"
 
 	"jkbkaiser/ray-tracing-go/pkg/color"
@@ -31,14 +32,21 @@ type Camera struct {
 	pixel00Loc        vec3.Vec3
 	deltaU            vec3.Vec3
 	deltaV            vec3.Vec3
+
+	NumberOfSamples  int
+	pixelSampleScale float64
+
+	MaxDepth int
 }
 
 func New() Camera {
 	return Camera{
-		AspectRatio:    16. / 9.,
-		ImageWidth:     400,
-		FocalLength:    1.,
-		ViewportHeight: 2.,
+		AspectRatio:     16. / 9.,
+		ImageWidth:      400,
+		FocalLength:     1.,
+		ViewportHeight:  2.,
+		NumberOfSamples: 100,
+		MaxDepth:        50,
 	}
 }
 
@@ -57,15 +65,20 @@ func (c *Camera) Initialize() {
 		Subtract(viewportU.Divide(2)).
 		Subtract(viewportV.Divide(2))
 	c.pixel00Loc = c.viewportUpperLeft.Add(c.deltaU.Add(c.deltaV).Divide(2))
+
+	c.pixelSampleScale = 1. / float64(c.NumberOfSamples)
 }
 
-func rayColor(r ray.Ray, world hittable.HittableList) color.Color {
+func rayColor(r ray.Ray, depth int, world hittable.HittableList) color.Color {
+	if depth < 0 {
+		return color.Color{}
+	}
+
 	hitRecord := hittable.HitRecord{}
 
-	if world.Hit(r, interval.New(0, math.Inf(1)), &hitRecord) {
-		return color.FromVec(
-			hitRecord.Normal.Add(vec3.Vec3{X: 1, Y: 1, Z: 1}).Scale(.5),
-		)
+	if world.Hit(r, interval.New(0.001, math.Inf(1)), &hitRecord) {
+		direction := hitRecord.Normal.Add(vec3.RandomUnit())
+		return rayColor(ray.Ray{Origin: hitRecord.Point, Direction: direction}, depth-1, world).Scale(.5)
 	}
 
 	a := .5 * (r.Direction.Norm().Y + 1.0)
@@ -74,25 +87,44 @@ func rayColor(r ray.Ray, world hittable.HittableList) color.Color {
 	return startColor.Scale(1. - a).Add(endColor.Scale(a))
 }
 
-func (c Camera) Render(world hittable.HittableList) {
-	pb := progress_bar.ProgressBar{Max: c.imageHeight, Length: 30, Writer: os.Stderr}
+func (cam Camera) getRay(i int, j int) ray.Ray {
+	offset := cam.sampleSqure()
+	pixelCenter := cam.pixel00Loc.
+		Add(cam.deltaU.Scale(float64(j) + offset.X)).
+		Add(cam.deltaV.Scale(float64(i) + offset.Y))
+
+	ray := ray.Ray{
+		Origin:    cam.CameraCenter,
+		Direction: pixelCenter.Subtract(cam.CameraCenter),
+	}
+
+	return ray
+}
+
+func (cam Camera) sampleSqure() vec3.Vec3 {
+	return vec3.Vec3{
+		X: rand.Float64() - .5,
+		Y: rand.Float64() - .5,
+		Z: .0,
+	}
+}
+
+func (cam Camera) Render(world hittable.HittableList) {
+	pb := progress_bar.ProgressBar{Max: cam.imageHeight, Length: 30, Writer: os.Stderr}
 
 	fmt.Println("P3")
-	fmt.Println(c.ImageWidth, c.imageHeight, c.maxColor)
+	fmt.Println(cam.ImageWidth, cam.imageHeight, cam.maxColor)
 
-	for i := range c.imageHeight {
-		for j := range c.ImageWidth {
-			pixelCenter := c.pixel00Loc.
-				Add(c.deltaU.Scale(float64(j))).
-				Add(c.deltaV.Scale(float64(i)))
+	for i := range cam.imageHeight {
+		for j := range cam.ImageWidth {
+			c := color.Color{}
 
-			ray := ray.Ray{
-				Origin:    c.CameraCenter,
-				Direction: pixelCenter.Subtract(c.CameraCenter),
+			for range cam.NumberOfSamples {
+				ray := cam.getRay(i, j)
+				c = c.Add(rayColor(ray, cam.MaxDepth, world))
 			}
 
-			c := rayColor(ray, world)
-			c.Write()
+			c.Scale(cam.pixelSampleScale).Write()
 		}
 
 		pb.Tick()
