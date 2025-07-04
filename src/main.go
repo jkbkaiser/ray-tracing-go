@@ -54,9 +54,9 @@ func main() {
 
 	cam := camera.New()
 	cam.AspectRatio = 16. / 9.
-	cam.ImageWidth = 400
-	cam.NumberOfSamples = 10
-	cam.MaxDepth = 50
+	cam.ImageWidth = 600
+	cam.NumberOfSamples = 50
+	cam.MaxDepth = 100
 
 	cam.FieldOfView = 20
 	cam.LookFrom = vec3.Vec3{X: 13, Y: 2, Z: 3}

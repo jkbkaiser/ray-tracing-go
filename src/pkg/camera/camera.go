@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"sync"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -154,23 +155,72 @@ func (cam Camera) sampleSqure() vec3.Vec3 {
 }
 
 func (cam Camera) Render(world hittable.HittableList) {
-	pb := progress_bar.ProgressBar{Max: cam.imageHeight, Length: 30, Writer: os.Stderr}
+	parrallel := true
 
 	fmt.Println("P3")
 	fmt.Println(cam.ImageWidth, cam.imageHeight, cam.maxColor)
 
-	for i := range cam.imageHeight {
-		for j := range cam.ImageWidth {
-			c := color.Color{}
+	if parrallel {
+	  pb := progress_bar.ProgressBar{Max: cam.imageHeight * cam.ImageWidth, Length: 30, Writer: os.Stderr}
+		type pixelResult struct {
+			color color.Color
+			order int
+		}
+		var wg sync.WaitGroup
+		pixChan := make(chan pixelResult, cam.imageHeight * cam.ImageWidth)
+		
+		order := 0
+		for i := range cam.imageHeight {
+			for j := range cam.ImageWidth {
+				wg.Add(1)
+				iCopy, jCopy, orderCopy := i, j, order
 
-			for range cam.NumberOfSamples {
-				ray := cam.getRay(i, j)
-				c = c.Add(rayColor(ray, cam.MaxDepth, world))
+				go func() {
+					defer wg.Done()
+					c := color.Color{}
+
+					for range cam.NumberOfSamples {
+						ray := cam.getRay(iCopy, jCopy)
+						c = c.Add(rayColor(ray, cam.MaxDepth, world))
+					}
+
+					// c.Scale(cam.pixelSampleScale).Write()
+					pixChan <- pixelResult{c, orderCopy}
+				}()
+
+				order++
 			}
-
-			c.Scale(cam.pixelSampleScale).Write()
 		}
 
-		pb.Tick()
+		go func() {
+			wg.Wait()
+			close(pixChan)
+		}()
+
+		pixelResults := make([]color.Color, cam.imageHeight * cam.ImageWidth)
+
+		for pixelResult := range pixChan {
+			pixelResults[pixelResult.order] = pixelResult.color
+			pb.Tick()
+		}
+
+		for _, element := range pixelResults {
+			element.Scale(cam.pixelSampleScale).Write()
+		}
+	} else {
+	  pb := progress_bar.ProgressBar{Max: cam.imageHeight, Length: 30, Writer: os.Stderr}
+		for i := range cam.imageHeight {
+			for j := range cam.ImageWidth {
+				c := color.Color{}
+
+				for range cam.NumberOfSamples {
+					ray := cam.getRay(i, j)
+					c = c.Add(rayColor(ray, cam.MaxDepth, world))
+				}
+
+				c.Scale(cam.pixelSampleScale).Write()
+			}
+			pb.Tick()
+		}
 	}
 }
